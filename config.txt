@@ -157,7 +157,7 @@
 # and 48000. If your card supports it you might get away with
 # 96000, or even 192000.
 
-# audio_sample_rate = 44100
+audio_sample_rate = 44100
 
 # Audio buffer size. Setting this to lower can improve latency,
 # so audio will be heard sooner after it is set to be changed.
@@ -188,12 +188,12 @@
 # cubic (slow, great quality)
 # fir (very slow, excellent quality)
 
-# modplug_resample_mode = linear
+modplug_resample_mode = linear
 
 # Whether music/samples should be played or not.
 # Does not include PC speaker effects.
 
-# music_on = 1
+music_on = 0
 
 # Whether PC speaker effects should be played or not.
 
@@ -201,7 +201,7 @@
 
 # Volume music plays at
 
-# music_volume = 8
+music_volume = 8
 
 # Volume samples play at
 
@@ -216,11 +216,13 @@
 
 # Name of the directory where MegaZeux should start.
 
-# startup_path = /home/username/MegaZeux
+startup_path = /game
 
 # Name of world file that should be loaded when MZX starts.
 
-# startup_file = caverns.mzx
+#startup_file = GRD.mzx
+startup_file = CAVERNS.MZX
+#startup_file = depotdungeons.mzx
 
 # Default save file name given when you first try to save.
 

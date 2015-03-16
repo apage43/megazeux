@@ -58,10 +58,10 @@ void gl_set_attributes(struct graphics_data *graphics)
 {
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-  if(graphics->gl_vsync == 0)
-    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 0);
-  else if(graphics->gl_vsync >= 1)
-    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 1);
+//  if(graphics->gl_vsync == 0)
+//    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 0);
+//  else if(graphics->gl_vsync >= 1)
+//    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 1);
 }
 
 bool gl_swap_buffers(struct graphics_data *graphics)

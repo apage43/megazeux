@@ -13,6 +13,7 @@
 ifeq ($(filter -r,$(MAKEFLAGS)),)
 MAKEFLAGS += -r
 endif
+BINEXT=.html
 
 .PHONY: clean help_check mzx mzx.debug build build_clean source
 
@@ -39,21 +40,21 @@ MKDIR   ?= mkdir
 MV      ?= mv
 RM      ?= rm
 
-SDL_CFLAGS  ?= `sdl-config --cflags`
-SDL_LDFLAGS ?= `sdl-config --libs`
+#SDL_CFLAGS  ?= `sdl-config --cflags`
+#SDL_LDFLAGS ?= `sdl-config --libs`
 
-VORBIS_CFLAGS  ?= -I${PREFIX}/include -DOV_EXCLUDE_STATIC_CALLBACKS
+VORBIS_CFLAGS  ?= -DOV_EXCLUDE_STATIC_CALLBACKS -I${HOME}/emsc/include
 ifneq (${TREMOR},1)
-VORBIS_LDFLAGS ?= -L${PREFIX}/lib -lvorbisfile -lvorbis -logg
+VORBIS_LDFLAGS ?= -L${HOME}/emsc/lib -lvorbisfile -lvorbis -logg
 else
-VORBIS_LDFLAGS ?= -L${PREFIX}/lib -lvorbisidec
+VORBIS_LDFLAGS ?= -lvorbisidec
 endif
 
-MIKMOD_CFLAGS  ?= -I${PREFIX}/include
-MIKMOD_LDFLAGS ?= -L${PREFIX}/lib -lmikmod
+MIKMOD_CFLAGS  ?= 
+MIKMOD_LDFLAGS ?= -lmikmod
 
-ZLIB_CFLAGS  ?= -I${PREFIX}/include
-ZLIB_LDFLAGS ?= -L${PREFIX}/lib -lz
+ZLIB_CFLAGS  ?= -I${HOME}/emsc/include
+ZLIB_LDFLAGS ?= -L${HOME}/emsc/lib -lz
 
 ifeq (${LIBPNG},1)
 LIBPNG_CFLAGS  ?= `libpng-config --cflags`
@@ -62,19 +63,23 @@ endif
 
 PTHREAD_LDFLAGS ?= -lpthread
 
-OPTIMIZE_CFLAGS ?= -O2
+OPTIMIZE_CFLAGS ?= -O3
+
+EMFLAGS = -s TOTAL_MEMORY=134217728 --memory-init-file 1 -s ASSERTIONS=1  \
+					-s CASE_INSENSITIVE_FS=1 -s INLINING_LIMIT=50 -s OUTLINING_LIMIT=20000
 
 ifeq (${DEBUG},1)
 #
 # Disable the optimizer for "true" debug builds
 #
-CFLAGS   = -O0 -DDEBUG
-CXXFLAGS = -O0 -DDEBUG
+
+CFLAGS   = -O3 -DDEBUG ${EMFLAGS}
+CXXFLAGS = -O3 -DDEBUG
 else
 #
 # Optimized builds have assert() compiled out
 #
-CFLAGS   += ${OPTIMIZE_CFLAGS} -DNDEBUG
+CFLAGS   += ${OPTIMIZE_CFLAGS} -DNDEBUG ${EMFLAGS}
 CXXFLAGS += ${OPTIMIZE_CFLAGS} -DNDEBUG
 endif
 
@@ -90,11 +95,11 @@ endif
 # Always generate debug information; this may end up being
 # stripped (on embedded platforms) or objcopy'ed out.
 #
-CFLAGS   += -g -W -Wall -Wno-unused-parameter -std=gnu99
-CFLAGS   += -Wdeclaration-after-statement ${ARCH_CFLAGS}
+CFLAGS   += -g -W -Wall -Wno-return-type -Wno-unused-parameter -std=gnu99
+CFLAGS   += -Wdeclaration-after-statement ${ARCH_CFLAGS} 
 CXXFLAGS += -g -W -Wall -Wno-unused-parameter -std=gnu++98
 CXXFLAGS += -fno-exceptions -fno-rtti ${ARCH_CXXFLAGS}
-LDFLAGS  += ${ARCH_LDFLAGS}
+LDFLAGS  += ${ARCH_LDFLAGS} ${EMFLAGS} --preload-file assets --preload-file game --preload-file config.txt
 
 ifeq (${shell ${CC} -dumpversion | cut -d. -f1},4)
 

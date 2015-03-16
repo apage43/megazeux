@@ -50,6 +50,7 @@
 #include "network/network.h"
 
 #include "lol_coroutines.h"
+#include <emscripten.h>
 
 #ifndef VERSION
 #error Must define VERSION for MegaZeux version string
@@ -78,7 +79,10 @@ void main_game_loop()
   if (!cr_throw) {
     main_game_loop_running = 0;
   } else {
-    delay(cr_throw - 1);
+    //delay(cr_throw - 1);
+    int speed = main_game_loop_mzx_world->mzx_speed - 1;
+    if(speed <= 0) speed = 1;
+    emscripten_set_main_loop_timing(EM_TIMING_RAF, speed);
     cr_throw = 0;
   }
 }
@@ -180,9 +184,12 @@ __libspec int main(int argc, char *argv[])
   // Run main game (mouse is hidden and palette is faded)
   //title_screen(&mzx_world);
   main_game_loop_mzx_world = &mzx_world;
-  while (main_game_loop_running) {
-    main_game_loop();
-  }
+  //while (main_game_loop_running) {
+  //  main_game_loop();
+  //}
+  emscripten_set_main_loop(main_game_loop, 0, 0);
+  err = 0;
+  return err;
   
   //vquick_fadeout();
 
