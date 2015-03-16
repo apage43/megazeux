@@ -51,6 +51,8 @@
 #include "util.h"
 #include "validation.h"
 
+#include "lol_coroutines.h"
+
 static const char magic_code[16] =
  "\xE6\x52\xEB\xF2\x6D\x4D\x4A\xB7\x87\xB2\x92\x88\xDE\x91\x24";
 
@@ -1005,16 +1007,25 @@ void optimize_null_boards(struct world *mzx_world)
 __editor_maybe_static FILE *try_load_world(const char *file,
  bool savegame, int *version, char *name)
 {
-  FILE *fp;
-  char magic[5];
-  int v;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  static FILE *fp;
+  static char magic[5];
+  static int v;
 
-  enum val_result status = validate_world_file(file, savegame, NULL, 0);
+  static enum val_result status;
+  cr_before(1);
+  status = validate_world_file(file, savegame, NULL, 0);
+  cr_after();
 
   if(VAL_NEED_UNLOCK == status)
   {
     decrypt(file);
+    cr_before(2);
     status = validate_world_file(file, savegame, NULL, 1);
+    cr_after();
   }
   if(VAL_SUCCESS != status)
     goto err_out;
@@ -1652,11 +1663,15 @@ __editor_maybe_static void default_global_data(struct world *mzx_world)
 
 bool reload_world(struct world *mzx_world, const char *file, int *faded)
 {
-  char name[BOARD_NAME_SIZE];
-  int version;
-  FILE *fp;
-
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static char name[BOARD_NAME_SIZE];
+  static int version;
+  static FILE *fp;
+  cr_before(1);
   fp = try_load_world(file, false, &version, name);
+  cr_after();
   if(!fp)
     return false;
 
@@ -1692,11 +1707,16 @@ bool reload_world(struct world *mzx_world, const char *file, int *faded)
 
 bool reload_savegame(struct world *mzx_world, const char *file, int *faded)
 {
-  int version;
-  FILE *fp;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static int version;
+  static FILE *fp;
 
   // Check this SAV is actually loadable
+  cr_before(1);
   fp = try_load_world(file, true, &version, NULL);
+  cr_after();
   if(!fp)
     return false;
 
@@ -1714,13 +1734,18 @@ bool reload_savegame(struct world *mzx_world, const char *file, int *faded)
 
 bool reload_swap(struct world *mzx_world, const char *file, int *faded)
 {
-  char name[BOARD_NAME_SIZE];
-  char full_path[MAX_PATH];
-  char file_name[MAX_PATH];
-  int version;
-  FILE *fp;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static char name[BOARD_NAME_SIZE];
+  static char full_path[MAX_PATH];
+  static char file_name[MAX_PATH];
+  static int version;
+  static FILE *fp;
 
+  cr_before(1);
   fp = try_load_world(file, false, &version, name);
+  cr_after();
   if(!fp)
     return false;
 

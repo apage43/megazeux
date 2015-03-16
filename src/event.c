@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lol_coroutines.h"
+
 #define KEY_REPEAT_START    250
 #define KEY_REPEAT_RATE     33
 
@@ -428,8 +430,12 @@ void wait_event(void)
 
 Uint32 update_event_status_delay(void)
 {
-  int rval = update_event_status();
-  int delay_ticks;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static int rval;
+  static int delay_ticks;
+  rval = update_event_status();
 
   if(!last_update_time)
     last_update_time = get_ticks();
@@ -440,8 +446,9 @@ Uint32 update_event_status_delay(void)
 
   if(delay_ticks < 0)
     delay_ticks = 0;
-
-  delay(delay_ticks);
+  cr_before(1);
+  cr_delay(delay_ticks);
+  cr_after();
   return rval;
 }
 

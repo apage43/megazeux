@@ -43,6 +43,8 @@
 #include "world.h"
 #include "util.h"
 
+#include "lol_coroutines.h"
+
 #ifdef CONFIG_UTHASH
 #include "uthash_caseinsensitive.h"
 struct counter *counter_head = NULL; // NULL is important
@@ -2592,7 +2594,12 @@ static struct robot *get_robot_by_id(struct world *mzx_world, int id)
 int set_counter_special(struct world *mzx_world, char *char_value,
  int value, int id)
 {
-  struct robot *cur_robot = get_robot_by_id(mzx_world, id);
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  static struct robot *cur_robot;
+  cur_robot = get_robot_by_id(mzx_world, id);
 
   switch(mzx_world->special_counter_return)
   {
@@ -2788,12 +2795,18 @@ int set_counter_special(struct world *mzx_world, char *char_value,
 
       if(!fsafetranslate(char_value, translated_path))
       {
-        if(reload_savegame(mzx_world, translated_path, &faded))
+        cr_before(1);
+        bool retval = reload_savegame(mzx_world, translated_path, &faded);
+        cr_after();
+        if(retval)
         {
-          if(faded)
+          if(faded) {
+            cr_before(2);
             insta_fadeout();
-          else
+            cr_after();
+          } else {
             insta_fadein();
+          }
           // Let game.c handle the rest for now
           mzx_world->swapped = 2;
         }

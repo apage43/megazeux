@@ -54,6 +54,11 @@
 #include "extmem.h"
 #include "util.h"
 
+#include "lol_coroutines.h"
+
+int cr_reentry = 0;
+int cr_throw = 0;
+
 #define MESG_TIMEOUT 160
 
 // Number of cycles to make player idle before repeating a
@@ -250,8 +255,12 @@ void set_caption(struct world *mzx_world, struct board *board,
 
 static void load_world_file(struct world *mzx_world, char *name)
 {
-  struct board *src_board;
-  int fade = 0;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static struct board *src_board;
+  static int fade;
+  fade = 0;
 
   // Load world
   end_module();
@@ -260,7 +269,10 @@ static void load_world_file(struct world *mzx_world, char *name)
   clear_screen(32, 7);
   // Palette
   default_palette();
-  if(reload_world(mzx_world, name, &fade))
+  cr_before(1);
+  bool retval = reload_world(mzx_world, name, &fade);
+  cr_after();
+  if(retval)
   {
     // Load was successful, so set curr_file
     if(curr_file != name)
@@ -286,23 +298,43 @@ static void load_world_file(struct world *mzx_world, char *name)
 
 static void load_world_selection(struct world *mzx_world)
 {
-  char world_name[MAX_PATH] = { 0 };
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  static char world_name[MAX_PATH];
+  world_name[0] = '\0';
 
   m_show();
-  if(!choose_file_ch(mzx_world, world_ext,
-   world_name, "Load World", 1))
+  cr_before(1);
+  int retval = !choose_file_ch(mzx_world, world_ext, world_name, "Load World", 1);
+  cr_after();
+  if(retval)
   {
+    cr_before(2);
     load_world_file(mzx_world, world_name);
+    cr_after();
   }
 }
 
 static void update_player(struct world *mzx_world)
 {
-  struct board *src_board = mzx_world->current_board;
-  int player_x = mzx_world->player_x;
-  int player_y = mzx_world->player_y;
-  int board_width = src_board->board_width;
-  enum thing under_id =
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  
+  static struct board *src_board;
+  static int player_x;
+  static int player_y;
+  static int board_width;
+  static enum thing under_id;
+  
+  src_board = mzx_world->current_board;
+  player_x = mzx_world->player_x;
+  player_y = mzx_world->player_y;
+  board_width = src_board->board_width;
+  under_id =
    (enum thing)src_board->level_under_id[player_x +
    (player_y * board_width)];
 
@@ -319,7 +351,10 @@ static void update_player(struct world *mzx_world)
       int player_last_dir = src_board->player_last_dir;
       if(player_last_dir & 0x0F)
       {
-        if(move_player(mzx_world, (player_last_dir & 0x0F) - 1))
+        cr_before(1);
+        int retval = move_player(mzx_world, (player_last_dir & 0x0F) - 1);
+        cr_after();
+        if(retval)
           src_board->player_last_dir = player_last_dir & 0xF0;
       }
       break;
@@ -349,7 +384,9 @@ static void update_player(struct world *mzx_world)
 
     default:
     {
+      cr_before(2);
       move_player(mzx_world, under_id - 21);
+      cr_after();
       break;
     }
   }
@@ -491,14 +528,18 @@ static void set_3_mesg(struct world *mzx_world, const char *str1, int num,
 
 static void game_settings(struct world *mzx_world)
 {
-  struct board *src_board = mzx_world->current_board;
-  int mzx_speed, music, sfx;
-  int music_volume, sound_volume, sfx_volume;
-  struct dialog di;
-  int dialog_result;
-  int speed_option = 0;
-  int num_elements = 8;
-  int start_option = 0;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  
+  static struct board *src_board;
+  static int mzx_speed, music, sfx;
+  static int music_volume, sound_volume, sfx_volume;
+  static struct dialog di;
+  static int dialog_result;
+  static int speed_option;
+  static int num_elements;
+  static int start_option;
 
   const char *radio_strings_1[2] =
   {
@@ -508,7 +549,12 @@ static void game_settings(struct world *mzx_world)
   {
     "PC speaker SFX on", "PC speaker SFX off"
   };
-  struct element *elements[9];
+  static struct element *elements[9];
+  
+  src_board = mzx_world->current_board;
+  speed_option = 0;
+  num_elements = 8;
+  start_option = 0;
 
   if(!mzx_world->lock_speed)// || editing)
   {
@@ -545,8 +591,10 @@ static void game_settings(struct world *mzx_world)
   music_volume = get_music_volume();
   sound_volume = get_sound_volume();
   sfx_volume = get_sfx_volume();
-
+  
+  cr_before(1);
   dialog_result = run_dialog(mzx_world, &di);
+  cr_after();
   destruct_dialog(&di);
   pop_context();
 
@@ -1002,23 +1050,52 @@ __editor_maybe_static void draw_viewport(struct world *mzx_world)
 // Returns non-0 to skip all keys this cycle
 static int update(struct world *mzx_world, int game, int *fadein)
 {
-  int start_ticks = get_ticks();
-  int time_remaining;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter(4);
+  cr_reenter(5);
+  cr_reenter(6);
+  cr_reenter(7);
+  cr_reenter(8);
+  cr_reenter(9);
+  cr_reenter(10);
+  cr_reenter(11);
+  cr_reenter_end();
+  
   static int reload = 0;
   static int slowed = 0; // Flips between 0 and 1 during slow_time
-  char tmp_str[10];
-  struct board *src_board = mzx_world->current_board;
-  int volume = src_board->volume;
-  int volume_inc = src_board->volume_inc;
-  int volume_target = src_board->volume_target;
-  int board_width = src_board->board_width;
-  int board_height = src_board->board_height;
-  char *level_id = src_board->level_id;
-  char *level_color = src_board->level_color;
-  char *level_under_id = src_board->level_under_id;
-  char *level_under_color = src_board->level_under_color;
-  char *level_under_param = src_board->level_under_param;
-  int total_ticks;
+
+  static int start_ticks;
+  static int time_remaining;
+
+  static char tmp_str[10];
+  static struct board *src_board;
+  static int volume;
+  static int volume_inc;
+  static int volume_target;
+  static int board_width;
+  static int board_height;
+  static char *level_id;
+  static char *level_color;
+  static char *level_under_id;
+  static char *level_under_color;
+  static char *level_under_param;
+  static int total_ticks;
+
+  start_ticks = get_ticks();
+  src_board = mzx_world->current_board;
+  volume = src_board->volume;
+  volume_inc = src_board->volume_inc;
+  volume_target = src_board->volume_target;
+  board_width = src_board->board_width;
+  board_height = src_board->board_height;
+  level_id = src_board->level_id;
+  level_color = src_board->level_color;
+  level_under_id = src_board->level_under_id;
+  level_under_color = src_board->level_under_color;
+  level_under_param = src_board->level_under_param;
 
   pal_update = false;
 
@@ -1071,7 +1148,9 @@ static int update(struct world *mzx_world, int game, int *fadein)
 
   // Update
   update_variables(mzx_world, slowed);
+  cr_before(9);
   update_player(mzx_world); // Ice, fire, water, lava
+  cr_after();
 
   if(mzx_world->wind_dur > 0)
   {
@@ -1082,7 +1161,9 @@ static int update(struct world *mzx_world, int game, int *fadein)
       // No wind this turn if above 3
       src_board->player_last_dir =
        (src_board->player_last_dir & 0xF0) + wind_dir;
+      cr_before(4);
       move_player(mzx_world, wind_dir);
+      cr_after();
     }
   }
 
@@ -1140,10 +1221,13 @@ static int update(struct world *mzx_world, int game, int *fadein)
     if((get_key_status(keycode_internal, IKEY_UP)) &&
      (!src_board->player_ns_locked))
     {
-      int key_up_delay = mzx_world->key_up_delay;
+      static int key_up_delay;
+      key_up_delay = mzx_world->key_up_delay;
       if((key_up_delay == 0) || (key_up_delay > REPEAT_WAIT))
       {
+        cr_before(5);
         move_player(mzx_world, 0);
+        cr_after();
         src_board->player_last_dir = (src_board->player_last_dir & 0x0F);
       }
       if(key_up_delay <= REPEAT_WAIT)
@@ -1154,10 +1238,13 @@ static int update(struct world *mzx_world, int game, int *fadein)
     if((get_key_status(keycode_internal, IKEY_DOWN)) &&
      (!src_board->player_ns_locked))
     {
-      int key_down_delay = mzx_world->key_down_delay;
+      static int key_down_delay;
+      key_down_delay = mzx_world->key_down_delay;
       if((key_down_delay == 0) || (key_down_delay > REPEAT_WAIT))
       {
+        cr_before(6);
         move_player(mzx_world, 1);
+        cr_after();
         src_board->player_last_dir =
          (src_board->player_last_dir & 0x0F) + 0x10;
       }
@@ -1169,10 +1256,13 @@ static int update(struct world *mzx_world, int game, int *fadein)
     if((get_key_status(keycode_internal, IKEY_RIGHT)) &&
      (!src_board->player_ew_locked))
     {
-      int key_right_delay = mzx_world->key_right_delay;
+      static int key_right_delay;
+      key_right_delay = mzx_world->key_right_delay;
       if((key_right_delay == 0) || (key_right_delay > REPEAT_WAIT))
       {
+        cr_before(7);
         move_player(mzx_world, 2);
+        cr_after();
         src_board->player_last_dir =
          (src_board->player_last_dir & 0x0F) + 0x20;
       }
@@ -1184,10 +1274,13 @@ static int update(struct world *mzx_world, int game, int *fadein)
     if((get_key_status(keycode_internal, IKEY_LEFT)) &&
      (!src_board->player_ew_locked))
     {
-      int key_left_delay = mzx_world->key_left_delay;
+      static int key_left_delay;
+      key_left_delay = mzx_world->key_left_delay;
       if((key_left_delay == 0) || (key_left_delay > REPEAT_WAIT))
       {
+        cr_before(8);
         move_player(mzx_world, 3);
+        cr_after();
         src_board->player_last_dir =
          (src_board->player_last_dir & 0x0F) + 0x30;
       }
@@ -1260,7 +1353,9 @@ static int update(struct world *mzx_world, int game, int *fadein)
   if((src_board->robot_list[0] != NULL) &&
    (src_board->robot_list[0])->used)
   {
+    cr_before(2);
     run_robot(mzx_world, 0, -1, -1);
+    cr_after();
     src_board = mzx_world->current_board;
     level_under_id = src_board->level_under_id;
     board_width = src_board->board_width;
@@ -1282,8 +1377,9 @@ static int update(struct world *mzx_world, int game, int *fadein)
     mzx_world->was_zapped = 0;
     if(flags[(int)level_under_id[d_offset]] & A_ENTRANCE)
       entrance = 0;
-
+    cr_before(3);
     update_board(mzx_world);
+    cr_after();
 
     src_board = mzx_world->current_board;
     level_under_id = src_board->level_under_id;
@@ -1590,12 +1686,16 @@ static int update(struct world *mzx_world, int game, int *fadein)
     if(total_ticks < 0)
       total_ticks = 0;
     // Delay for 16 * (speed - 1) since the beginning of the update
-    delay(total_ticks);
+    cr_before(1);
+    cr_delay(total_ticks);
+    cr_after();
   }
 
   if(*fadein)
   {
+    cr_before(10);
     vquick_fadein();
+    cr_after();
     *fadein = 0;
   }
 
@@ -1830,7 +1930,9 @@ static int update(struct world *mzx_world, int game, int *fadein)
       // Prepare for fadein
       if(!get_fade_status())
         *fadein = 1;
+      cr_before(11);
       vquick_fadeout();
+      cr_after();
     }
 
     mzx_world->target_where = TARGET_NONE;
@@ -1859,12 +1961,31 @@ static void focus_on_player(struct world *mzx_world)
 
 __editor_maybe_static void play_game(struct world *mzx_world)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter(4);
+  cr_reenter(5);
+  cr_reenter(6);
+  cr_reenter(7);
+  cr_reenter(8);
+  cr_reenter(9);
+  cr_reenter(10);
+  cr_reenter(11);
+  cr_reenter(12);
+  cr_reenter_end();
   // We have the world loaded, on the proper scene.
   // We are faded out. Commence playing!
-  int key = -1;
-  char keylbl[5] = "KEY?";
-  struct board *src_board;
-  int fadein = 1;
+  
+  static int key;
+  static char keylbl[5] = "KEY?";
+  static struct board *src_board;
+  static int fadein;
+  
+  key = -1;
+  strcpy(keylbl, "KEY?");
+  fadein = 1;
 
   // Main game loop
   // Mouse remains hidden unless menu/etc. is invoked
@@ -1876,7 +1997,10 @@ __editor_maybe_static void play_game(struct world *mzx_world)
     focus_on_player(mzx_world);
 
     // Update
-    if(update(mzx_world, 1, &fadein))
+    cr_before(1);
+    int update_retval = update(mzx_world, 1, &fadein);
+    cr_after();
+    if(update_retval)
     {
       update_event_status();
       continue;
@@ -1913,7 +2037,9 @@ __editor_maybe_static void play_game(struct world *mzx_world)
            get_counter(mzx_world, "HELP_MENU", 0))
           {
             m_show();
+            cr_before(3);
             help_system(mzx_world);
+            cr_after();
           }
           break;
         }
@@ -1926,8 +2052,9 @@ __editor_maybe_static void play_game(struct world *mzx_world)
            !mzx_world->active)
           {
             m_show();
-
+            cr_before(4);
             game_settings(mzx_world);
+            cr_after();
 
             update_event_status();
           }
@@ -1951,8 +2078,11 @@ __editor_maybe_static void play_game(struct world *mzx_world)
               strcpy(save_game, curr_sav);
 
               m_show();
-              if(!new_file(mzx_world, save_ext, ".sav", save_game,
-               "Save game", 1))
+              cr_before(7);
+              int retval = !new_file(mzx_world, save_ext, ".sav", save_game,
+               "Save game", 1);
+              cr_after();
+              if(retval)
               {
                 strcpy(curr_sav, save_game);
                 // Save entire game
@@ -1971,17 +2101,24 @@ __editor_maybe_static void play_game(struct world *mzx_world)
            get_counter(mzx_world, "LOAD_MENU", 0))
           {
             // Restore
-            char save_file_name[MAX_PATH] = { 0 };
+            static char save_file_name[MAX_PATH] = { 0 };
             m_show();
-
-            if(!choose_file_ch(mzx_world, save_ext, save_file_name,
-             "Choose game to restore", 1))
+            cr_before(6);
+            int retval = !choose_file_ch(mzx_world, save_ext, save_file_name,
+             "Choose game to restore", 1);
+            cr_after();
+            if(retval)
             {
               // Load game
               fadein = 0;
-              if(!reload_savegame(mzx_world, save_file_name, &fadein))
+              cr_before(8);
+              bool retval = !reload_savegame(mzx_world, save_file_name, &fadein);
+              cr_after();
+              if(retval)
               {
+                cr_before(10);
                 vquick_fadeout();
+                cr_after();
                 return;
               }
 
@@ -2158,15 +2295,20 @@ __editor_maybe_static void play_game(struct world *mzx_world)
           if(mzx_world->version < 0x0252 ||
            get_counter(mzx_world, "LOAD_MENU", 0))
           {
-            struct stat file_info;
+            static struct stat file_info;
 
             if(!stat(curr_sav, &file_info))
             {
               // Load game
               fadein = 0;
-              if(!reload_savegame(mzx_world, curr_sav, &fadein))
+              cr_before(9);
+              int retval = !reload_savegame(mzx_world, curr_sav, &fadein);
+              cr_after();
+              if (retval)
               {
+                cr_before(11);
                 vquick_fadeout();
+                cr_after();
                 return;
               }
 
@@ -2221,7 +2363,9 @@ __editor_maybe_static void play_game(struct world *mzx_world)
 
             do
             {
+              cr_before(2);
               update_event_status_delay();
+              cr_after();
               update_screen();
               key = get_key(keycode_internal);
             } while(key != IKEY_RETURN);
@@ -2237,8 +2381,10 @@ __editor_maybe_static void play_game(struct world *mzx_world)
         {
           // Quit
           m_show();
-
-          if(confirm(mzx_world, "Quit playing- Are you sure?"))
+          cr_before(5);
+          int retval = confirm(mzx_world, "Quit playing- Are you sure?");
+          cr_after();
+          if(retval)
             key = 0;
 
           update_event_status();
@@ -2249,18 +2395,55 @@ __editor_maybe_static void play_game(struct world *mzx_world)
   } while(key != IKEY_ESCAPE);
 
   pop_context();
+  cr_before(12);
   vquick_fadeout();
+  cr_after();
   clear_sfx_queue();
 }
 
 void title_screen(struct world *mzx_world)
 {
-  int fadein = 1;
-  int key = 0;
-  int fade;
-  struct stat file_info;
-  struct board *src_board;
-  char *current_dir;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter(4);
+  cr_reenter(5);
+  cr_reenter(6);
+  cr_reenter(7);
+  cr_reenter(8);
+  cr_reenter(9);
+  cr_reenter(10);
+  cr_reenter(11);
+  cr_reenter(12);
+  cr_reenter(13);
+  cr_reenter(14);
+  cr_reenter(15);
+  cr_reenter(16);
+  cr_reenter(17);
+  cr_reenter(18);
+  cr_reenter(19);
+  cr_reenter(20);
+  cr_reenter(21);
+  cr_reenter(22);
+  cr_reenter(23);
+  cr_reenter(24);
+  cr_reenter(25);
+  cr_reenter(26);
+  cr_reenter(27);
+  cr_reenter(28);
+  cr_reenter(29);
+  cr_reenter_end();
+
+  static int fadein ;
+  static int key;
+  static int fade;
+  static struct stat file_info;
+  static struct board *src_board;
+  static char *current_dir;
+  
+  fadein = 1;
+  key = 0;
 
   debug_mode = false;
 
@@ -2282,10 +2465,15 @@ void title_screen(struct world *mzx_world)
   }
   else
   {
-    if(!stat(curr_file, &file_info))
+    if(!stat(curr_file, &file_info)) {
+      cr_before(18);
       load_world_file(mzx_world, curr_file);
-    else
+      cr_after();
+    } else {
+      cr_before(11);
       load_world_selection(mzx_world);
+      cr_after();
+    }
   }
 
   src_board = mzx_world->current_board;
@@ -2306,7 +2494,10 @@ void title_screen(struct world *mzx_world)
     // Update
     if(mzx_world->active)
     {
-      if(update(mzx_world, 0, &fadein))
+      cr_before(1);
+      int update_retval = update(mzx_world, 0, &fadein);
+      cr_after();
+      if(update_retval)
       {
         update_event_status();
         continue;
@@ -2315,7 +2506,9 @@ void title_screen(struct world *mzx_world)
     else
     {
       // Give some delay time if nothing's loaded
+      cr_before(5);
       update_event_status_delay();
+      cr_after();
       update_screen();
     }
 
@@ -2336,7 +2529,9 @@ void title_screen(struct world *mzx_world)
         case IKEY_h:
         {
           m_show();
+          cr_before(7);
           help_system(mzx_world);
+          cr_after();
           update_screen();
           break;
         }
@@ -2346,8 +2541,9 @@ void title_screen(struct world *mzx_world)
         {
           // Settings
           m_show();
-
+          cr_before(8);
           game_settings(mzx_world);
+          cr_after();
 
           update_screen();
           update_event_status();
@@ -2357,7 +2553,9 @@ void title_screen(struct world *mzx_world)
         case IKEY_F3:
         case IKEY_l:
         {
+          cr_before(12);
           load_world_selection(mzx_world);
+          cr_after();
           fadein = 1;
           src_board = mzx_world->current_board;
           update_screen();
@@ -2372,9 +2570,11 @@ void title_screen(struct world *mzx_world)
 
           // Restore
           m_show();
-
-          if(!choose_file_ch(mzx_world, save_ext, save_file_name,
-           "Choose game to restore", 1))
+          cr_before(10);
+          int retval = !choose_file_ch(mzx_world, save_ext, save_file_name,
+           "Choose game to restore", 1);
+          cr_after();
+          if(retval)
           {
             // Swap out current board...
             clear_sfx_queue();
@@ -2386,8 +2586,11 @@ void title_screen(struct world *mzx_world)
             chdir(config_dir);
             set_config_from_file(&(mzx_world->conf), "game.cnf");
             chdir(current_dir);
-
-            if(reload_savegame(mzx_world, save_file_name, &fadein))
+            
+            cr_before(17);
+            bool retval = reload_savegame(mzx_world, save_file_name, &fadein);
+            cr_after();
+            if(retval)
             {
               src_board = mzx_world->current_board;
               // Swap in starting board
@@ -2409,10 +2612,12 @@ void title_screen(struct world *mzx_world)
               find_player(mzx_world);
               mzx_world->player_restart_x = mzx_world->player_x;
               mzx_world->player_restart_y = mzx_world->player_y;
+              cr_before(20);
               vquick_fadeout();
-
+              cr_after();
+              cr_before(2);
               play_game(mzx_world);
-
+              cr_after();
               // Done playing- load world again
               // Already faded out from play_game()
               end_module();
@@ -2424,7 +2629,10 @@ void title_screen(struct world *mzx_world)
               // Reload original file
               if(!stat(curr_file, &file_info))
               {
-                if(reload_world(mzx_world, curr_file, &fade))
+                cr_before(13);
+                int retval = reload_world(mzx_world, curr_file, &fade);
+                cr_after();
+                if(retval)
                 {
                   src_board = mzx_world->current_board;
                   load_board_module(src_board);
@@ -2438,7 +2646,9 @@ void title_screen(struct world *mzx_world)
               {
                 clear_world(mzx_world);
               }
+              cr_before(21);
               vquick_fadeout();
+              cr_after();
               fadein = 1;
             }
             break;
@@ -2463,8 +2673,10 @@ void title_screen(struct world *mzx_world)
             if(mzx_world->only_from_swap)
             {
               m_show();
+              cr_before(29);
               error("You can only play this game via a swap"
                " from another game", 0, 24, 0x3101);
+              cr_after();
               break;
             }
 
@@ -2482,7 +2694,10 @@ void title_screen(struct world *mzx_world)
             set_config_from_file(&(mzx_world->conf), "game.cnf");
             chdir(current_dir);
 
-            if(reload_world(mzx_world, curr_file, &fade))
+            cr_before(14);
+            bool retval = reload_world(mzx_world, curr_file, &fade);
+            cr_after();
+            if(retval)
             {
               if(mzx_world->current_board_id != mzx_world->first_board)
               {
@@ -2513,9 +2728,12 @@ void title_screen(struct world *mzx_world)
               find_player(mzx_world);
               mzx_world->player_restart_x = mzx_world->player_x;
               mzx_world->player_restart_y = mzx_world->player_y;
+              cr_before(22);
               vquick_fadeout();
-
+              cr_after();
+              cr_before(3);
               play_game(mzx_world);
+              cr_after();
               // Done playing- load world again
               // Already faded out from play_game()
               end_module();
@@ -2525,7 +2743,10 @@ void title_screen(struct world *mzx_world)
               default_palette();
               insta_fadein();
               // Reload original file
-              if(reload_world(mzx_world, curr_file, &fade))
+              cr_before(15);
+              bool retval = reload_world(mzx_world, curr_file, &fade);
+              cr_after();
+              if(retval)
               {
                 src_board = mzx_world->current_board;
                 load_board_module(src_board);
@@ -2533,7 +2754,9 @@ void title_screen(struct world *mzx_world)
                  src_board->mod_playing);
                 set_counter(mzx_world, "TIME", src_board->time_limit, 0);
               }
+              cr_before(23);
               vquick_fadeout();
+              cr_after();
               fadein = 1;
             }
             else
@@ -2576,12 +2799,17 @@ void title_screen(struct world *mzx_world)
           {
             // Editor
             clear_sfx_queue();
+            cr_before(24);
             vquick_fadeout();
+            cr_after();
             set_intro_mesg_timer(0);
             edit_world(mzx_world, reload_curr_world_in_editor);
 
-            if(curr_file[0])
+            if(curr_file[0]) {
+              cr_before(19);
               load_world_file(mzx_world, curr_file);
+              cr_after();
+            }
 
             fadein = 1;
           }
@@ -2607,7 +2835,9 @@ void title_screen(struct world *mzx_world)
 
           if(!reload_savegame(mzx_world, curr_sav, &fadein))
           {
+            cr_before(25);
             vquick_fadeout();
+            cr_after();
           }
           else
           {
@@ -2629,10 +2859,12 @@ void title_screen(struct world *mzx_world)
             find_player(mzx_world);
             mzx_world->player_restart_x = mzx_world->player_x;
             mzx_world->player_restart_y = mzx_world->player_y;
+            cr_before(26);
             vquick_fadeout();
-
+            cr_after();
+            cr_before(4);
             play_game(mzx_world);
-
+            cr_after();
             // Done playing- load world again
             // Already faded out from play_game()
             end_module();
@@ -2644,7 +2876,10 @@ void title_screen(struct world *mzx_world)
             // Reload original file
             if(!stat(curr_file, &file_info))
             {
-              if(reload_world(mzx_world, curr_file, &fade))
+              cr_before(16);
+              bool retval = reload_world(mzx_world, curr_file, &fade);
+              cr_after();
+              if(retval)
               {
                 src_board = mzx_world->current_board;
                 load_board_module(src_board);
@@ -2658,7 +2893,9 @@ void title_screen(struct world *mzx_world)
             {
               clear_world(mzx_world);
             }
+            cr_before(27);
             vquick_fadeout();
+            cr_after();
             fadein = 1;
           }
 
@@ -2689,7 +2926,9 @@ void title_screen(struct world *mzx_world)
 
           do
           {
+            cr_before(6);
             update_event_status_delay();
+            cr_after();
             update_screen();
             key = get_key(keycode_internal);
           } while(key != IKEY_RETURN && key != IKEY_ESCAPE);
@@ -2704,8 +2943,10 @@ void title_screen(struct world *mzx_world)
         {
           // Quit
           m_show();
-
-          if(confirm(mzx_world, "Exit MegaZeux - Are you sure?"))
+          cr_before(9);
+          int retval = confirm(mzx_world, "Exit MegaZeux - Are you sure?");
+          cr_after();
+          if(retval)
             key = 0;
 
           update_screen();
@@ -2717,7 +2958,9 @@ void title_screen(struct world *mzx_world)
     }
   } while(key != IKEY_ESCAPE);
 
+  cr_before(28);
   vquick_fadeout();
+  cr_after();
   clear_sfx_queue();
 
   free(current_dir);
@@ -2931,13 +3174,23 @@ void calculate_xytop(struct world *mzx_world, int *x, int *y)
 // Returns 1 if didn't move
 int move_player(struct world *mzx_world, int dir)
 {
-  struct board *src_board = mzx_world->current_board;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static struct board *src_board;
   // Dir is from 0 to 3
-  int player_x = mzx_world->player_x;
-  int player_y = mzx_world->player_y;
-  int new_x = player_x;
-  int new_y = player_y;
-  int edge = 0;
+  static int player_x;
+  static int player_y;
+  static int new_x;
+  static int new_y;
+  static int edge;
+  
+  src_board = mzx_world->current_board;
+  player_x = mzx_world->player_x;
+  player_y = mzx_world->player_y;
+  new_x = player_x;
+  new_y = player_y;
+  edge = 0;
 
   switch(dir)
   {
@@ -3051,10 +3304,15 @@ int move_player(struct world *mzx_world, int dir)
     if((d_flag & A_ITEM) && (d_id != ROBOT_PUSHABLE))
     {
       // Item
-      enum thing d_under_id = (enum thing)mzx_world->under_player_id;
-      char d_under_color = mzx_world->under_player_color;
-      char d_under_param = mzx_world->under_player_param;
+      static enum thing d_under_id;
+      static char d_under_color;
+      static char d_under_param;
+      d_under_id = (enum thing)mzx_world->under_player_id;
+      d_under_color = mzx_world->under_player_color;
+      d_under_param = mzx_world->under_player_param;
+      cr_before(1);
       int grab_result = grab_item(mzx_world, d_offset, dir);
+      cr_after();
       if(grab_result)
       {
         if(d_id == TRANSPORT)
@@ -3158,14 +3416,25 @@ int move_player(struct world *mzx_world, int dir)
 
 int grab_item(struct world *mzx_world, int offset, int dir)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter_end();
   // Dir is for transporter
-  struct board *src_board = mzx_world->current_board;
-  enum thing id = (enum thing)src_board->level_id[offset];
-  char param = src_board->level_param[offset];
-  char color = src_board->level_color[offset];
-  int remove = 0;
+  static struct board *src_board;
+  static enum thing id;
+  static char param;
+  static char color;
+  static int remove;
 
-  char tmp[81];
+  static char tmp[81];
+  
+  src_board = mzx_world->current_board;
+  id = (enum thing)src_board->level_id[offset];
+  param = src_board->level_param[offset];
+  color = src_board->level_color[offset];
+  remove = 0;
 
   switch(id)
   {
@@ -3255,9 +3524,10 @@ int grab_item(struct world *mzx_world, int offset, int dir)
         {
           int answer;
           m_show();
+          cr_before(2);
           answer = confirm(mzx_world,
            "Inside the chest you find a potion. Drink it?");
-
+          cr_after();
           if(answer)
             return 0;
 
@@ -3271,9 +3541,10 @@ int grab_item(struct world *mzx_world, int offset, int dir)
           int answer;
 
           m_show();
-
+          cr_before(3);
           answer = confirm(mzx_world,
            "Inside the chest you find a ring. Wear it?");
+          cr_after();
 
           if(answer)
             return 0;
@@ -3633,11 +3904,14 @@ int grab_item(struct world *mzx_world, int offset, int dir)
     case SIGN:
     case SCROLL:
     {
-      int idx = param;
+      static int idx;
+      idx = param;
       play_sfx(mzx_world, 47);
 
       m_show();
+      cr_before(1);
       scroll_edit(mzx_world, src_board->scroll_list[idx], id & 1);
+      cr_after();
 
       if(id == SCROLL)
         remove = 1;

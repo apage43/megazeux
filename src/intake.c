@@ -27,6 +27,8 @@
 #include "graphics.h"
 #include "window.h"
 
+#include "lol_coroutines.h"
+
 // Global status of insert
 static char insert_on = 1;
 
@@ -67,13 +69,17 @@ int intake(struct world *mzx_world, char *string, int max_len,
  int x, int y, char color, int exit_type, int filter_type,
  int *return_x_pos, bool robo_intk, char *macro)
 {
-  int currx, curr_len, macro_position = -1;
-  int done = 0, place = 0;
-  char cur_char = 0;
-  char temp_char;
-  int use_mask = mzx_world->conf.mask_midchars;
-  int mouse_press;
-  int key;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  static int currx, curr_len, macro_position, done, place, use_mask, mouse_press, key;
+  static char cur_char, temp_char;
+  
+  macro_position = -1;
+  done = 0, place = 0;
+  cur_char = 0;
+  use_mask = mzx_world->conf.mask_midchars;
 
   if(macro != NULL)
     macro_position = 0;
@@ -200,7 +206,9 @@ int intake(struct world *mzx_world, char *string, int max_len,
     else
     {
       update_screen();
+      cr_before(1);
       update_event_status_delay();
+      cr_after();
       key = get_key(keycode_internal);
       place = 0;
 
@@ -483,7 +491,9 @@ int intake(struct world *mzx_world, char *string, int max_len,
         if(get_alt_status(keycode_internal) && !filter_type)
         {
           // If alt - C is pressed, choose character
+          cr_before(2);
           int new_char = char_selection(last_char);
+          cr_after();
           if(new_char >= 32)
           {
             cur_char = new_char;

@@ -36,6 +36,8 @@
 #include "robot.h"
 #include "util.h"
 
+#include "lol_coroutines.h"
+
 // For missile turning (directions)
 
 static const int cwturndir[4] = { 2, 3, 1, 0 };
@@ -190,25 +192,40 @@ static int arraydir2(struct board *src_board, int x, int y,
 
 void update_board(struct world *mzx_world)
 {
-  int i;
-  int x, y;
-  int level_offset;
-  struct board *src_board = mzx_world->current_board;
-  struct robot *cur_robot;
-  char *level_id = src_board->level_id;
-  char *level_param = src_board->level_param;
-  char *level_color = src_board->level_color;
-  char *level_under_id = src_board->level_under_id;
-  char *level_under_color = src_board->level_under_color;
-  int board_width = src_board->board_width;
-  int board_height = src_board->board_height;
-  int slow_down;
-  enum thing current_id;
-  char current_param;
-  char current_color;
-  enum thing current_under_id;
-  char *update_done = mzx_world->update_done;
-
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  
+  static int i;
+  static int x, y;
+  static int level_offset;
+  static struct board *src_board;
+  static struct robot *cur_robot;
+  static char *level_id;
+  static char *level_param;
+  static char *level_color;
+  static char *level_under_id;
+  static char *level_under_color;
+  static int board_width;
+  static int board_height;
+  static int slow_down;
+  static enum thing current_id;
+  static char current_param;
+  static char current_color;
+  static enum thing current_under_id;
+  static char *update_done;
+  
+  src_board = mzx_world->current_board;
+  level_id = src_board->level_id;
+  level_param = src_board->level_param;
+  level_color = src_board->level_color;
+  level_under_id = src_board->level_under_id;
+  level_under_color = src_board->level_under_color;
+  board_width = src_board->board_width;
+  board_height = src_board->board_height;
+  update_done = mzx_world->update_done;
+  
   // Toggle slow_down
   mzx_world->slow_down ^= 1;
   slow_down = mzx_world->slow_down;
@@ -246,7 +263,9 @@ void update_board(struct world *mzx_world)
         case ROBOT:
         case ROBOT_PUSHABLE:
         {
+          cr_before(1);
           run_robot(mzx_world, current_param, x, y);
+          cr_after();
 
           if(mzx_world->swapped)
           {
@@ -1808,7 +1827,9 @@ void update_board(struct world *mzx_world)
       {
         current_param = level_param[level_offset];
         // May change the source board (with swap world or load game)
+        cr_before(2);
         run_robot(mzx_world, -current_param, x, y);
+        cr_after();
 
         if(mzx_world->swapped)
         {

@@ -49,6 +49,8 @@
 #include "run_stubs.h"
 #include "network/network.h"
 
+#include "lol_coroutines.h"
+
 #ifndef VERSION
 #error Must define VERSION for MegaZeux version string
 #endif
@@ -64,6 +66,22 @@
 #else
 #define __libspec
 #endif
+
+
+// lol_coroutines
+int main_game_loop_running = 1;
+struct world *main_game_loop_mzx_world;
+
+void main_game_loop()
+{
+  title_screen(main_game_loop_mzx_world);
+  if (!cr_throw) {
+    main_game_loop_running = 0;
+  } else {
+    delay(cr_throw - 1);
+    cr_throw = 0;
+  }
+}
 
 __libspec int main(int argc, char *argv[])
 {
@@ -160,9 +178,13 @@ __libspec int main(int argc, char *argv[])
   mzx_world.default_speed = mzx_world.mzx_speed;
 
   // Run main game (mouse is hidden and palette is faded)
-  title_screen(&mzx_world);
-
-  vquick_fadeout();
+  //title_screen(&mzx_world);
+  main_game_loop_mzx_world = &mzx_world;
+  while (main_game_loop_running) {
+    main_game_loop();
+  }
+  
+  //vquick_fadeout();
 
   if(mzx_world.active)
   {

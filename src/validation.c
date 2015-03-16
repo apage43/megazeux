@@ -35,6 +35,8 @@
 #include "util.h"
 #include "legacy_rasm.h"
 
+#include "lol_coroutines.h"
+
 /****************************
  * LEGACY WORLD FORMAT INFO *
  ****************************/
@@ -113,16 +115,29 @@ int suppress_errors = -1;
 /* error messages */
 void val_error(enum val_error error_id, int value)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  cr_before(1);
   val_error_str(error_id, value, NULL);
+  cr_after();
 }
 
 void val_error_str(enum val_error error_id, int value, char *string)
 {
-  char error_mesg[80];
-  int hi = (value & 0xFF00) >> 8, lo = (value & 0xFF);
-  int opts = ERROR_OPT_OK;
-  int severity = 1;
-  int code = 0;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static char error_mesg[80];
+  static int hi, lo;
+  static int opts;
+  static int severity;
+  static int code;
+  
+  hi = (value & 0xFF00) >> 8, lo = (value & 0xFF);
+  opts = ERROR_OPT_OK;
+  severity = 1;
+  code = 0;
 
   switch (error_id)
   {
@@ -257,8 +272,11 @@ void val_error_str(enum val_error error_id, int value, char *string)
     }
   }
 
-  if(severity > suppress_errors)
+  if(severity > suppress_errors) {
+    cr_before(1);
     error(error_mesg, 1, opts, code);
+    cr_after();
+  }
 }
 
 FILE * val_fopen(const char *filename)
@@ -293,13 +311,18 @@ void set_validation_suppression(int level)
 enum val_result validate_world_file(const char *filename,
  int savegame, int *end_of_global_offset, int decrypt_attempted)
 {
-  enum val_result result = VAL_SUCCESS;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static enum val_result result;
 
-  FILE *f;
-  char magic[15];
-  int num_boards;
-  int board_name_offset;
-  int v, i;
+  static FILE *f;
+  static char magic[15];
+  static int num_boards;
+  static int board_name_offset;
+  static int v, i;
+  
+  result = VAL_SUCCESS;
 
   /* TEST 1:  Make sure it's a readable file */
   if(!(f = val_fopen(filename)))
@@ -448,8 +471,11 @@ enum val_result validate_world_file(const char *filename,
         goto err_invalid;
 
       val_error(WORLD_PASSWORD_PROTECTED, 0);
-
-      if(!confirm(NULL, "Would you like to decrypt it?"))
+      
+      cr_before(1);
+      int retval = !confirm(NULL, "Would you like to decrypt it?");
+      cr_after();
+      if(retval)
       {
         result = VAL_NEED_UNLOCK;
         goto err_close;

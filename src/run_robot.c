@@ -48,6 +48,8 @@
 #include "extmem.h"
 #include "util.h"
 
+#include "lol_coroutines.h"
+
 #define parsedir(a, b, c, d) \
  parsedir(mzx_world, a, b, c, d, _bl[0], _bl[1], _bl[2], _bl[3])
 
@@ -365,7 +367,6 @@ static int send_self_label_tr(struct world *mzx_world, char *param, int id)
 {
   char label_buffer[ROBOT_MAX_TR];
   tr_msg(mzx_world, param, id, label_buffer);
-
   if(send_robot_self(mzx_world,
    mzx_world->current_board->robot_list[id], label_buffer, 1))
   {
@@ -1144,29 +1145,60 @@ void replace_player(struct world *mzx_world)
 
 // Run a single robot through a single cycle.
 // If id is negative, only run it if status is 2
-void run_robot(struct world *mzx_world, int id, int x, int y)
+void run_robot(struct world *mzx_world, int _id, int _x, int _y)
 {
-  struct board *src_board = mzx_world->current_board;
-  struct robot *cur_robot;
-  int cmd; // Command to run
-  int lines_run = 0;
-  int gotoed;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter(4);
+  cr_reenter(5);
+  cr_reenter(6);
+  cr_reenter(7);
+  cr_reenter(8);
+  cr_reenter(9);
+  cr_reenter(10);
+  cr_reenter(11);
+  cr_reenter_end();
+  static int id, x, y;
+  id = _id; x = _x; y = _y;
+  
+  static struct board *src_board;
+  static struct robot *cur_robot;
+  static int cmd; // Command to run
+  static int lines_run;
+  static int gotoed;
 
-  int old_pos; // Old position to verify gotos DID something
-  int last_label = -1;
+  static int old_pos; // Old position to verify gotos DID something
+  static int last_label;
   // Whether blocked in a given direction (2 = OUR bullet)
-  int _bl[4] = { 0, 0, 0, 0 };
-  char *program;
-  char *cmd_ptr;
-  char done = 0;
-  char update_blocked = 0;
-  char first_cmd = 1;
-  char *level_id = src_board->level_id;
-  char *level_param = src_board->level_param;
-  char *level_color = src_board->level_color;
-  char *level_under_id = src_board->level_under_id;
-  int board_width = src_board->board_width;
-  int board_height = src_board->board_height;
+  static int _bl[4];
+  static char *program;
+  static char *cmd_ptr;
+  static char done;
+  static char update_blocked;
+  static char first_cmd;
+  static char *level_id;
+  static char *level_param;
+  static char *level_color;
+  static char *level_under_id;
+  static int board_width;
+  static int board_height;
+  
+  src_board = mzx_world->current_board;
+  lines_run = 0;
+
+  last_label = -1;
+  _bl[0] = 0; _bl[1] = 0; _bl[2] = 0; _bl[3] = 0;
+  done = 0;
+  update_blocked = 0;
+  first_cmd = 1;
+  level_id = src_board->level_id;
+  level_param = src_board->level_param;
+  level_color = src_board->level_color;
+  level_under_id = src_board->level_under_id;
+  board_width = src_board->board_width;
+  board_height = src_board->board_height;
 
   if((id < 0) && ((src_board->robot_list[-id])->status != 2))
     return;
@@ -1564,7 +1596,9 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
 
           if(mzx_world->special_counter_return != FOPEN_NONE)
           {
+            cr_before(5);
             gotoed = set_counter_special(mzx_world, dest_buffer, value, id);
+            cr_after();
 
             // We loaded a new game successfully; get out of here
             if(mzx_world->swapped)
@@ -2704,14 +2738,19 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
       case ROBOTIC_CMD_MOVE_PLAYER_DIR: // move player dir
       case ROBOTIC_CMD_MOVE_PLAYER_DIR_OR: // move pl dir "label"
       {
-        enum dir direction = parse_param_dir(mzx_world, cmd_ptr + 1);
+        static enum dir direction;
+        direction = parse_param_dir(mzx_world, cmd_ptr + 1);
         direction = parsedir(direction, x, y, cur_robot->walk_dir);
         if(is_cardinal_dir(direction))
         {
-          int old_x = mzx_world->player_x;
-          int old_y = mzx_world->player_y;
-          int old_board = mzx_world->current_board_id;
-          enum board_target old_target = mzx_world->target_where;
+          static int old_x;
+          static int old_y;
+          static int old_board;
+          static enum board_target old_target;
+          old_x = mzx_world->player_x;
+          old_y = mzx_world->player_y;
+          old_board = mzx_world->current_board_id;
+          old_target = mzx_world->target_where;
 
           // Have to fix vars and move to next command NOW, in case player
           // is sent to another screen!
@@ -2730,7 +2769,9 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
           cur_robot->ypos = y;
 
           // Move player
+          cr_before(6);
           move_player(mzx_world, dir_to_int(direction));
+          cr_after();
           if((mzx_world->player_x == old_x) &&
            (mzx_world->player_y == old_y) &&
            (mzx_world->current_board_id == old_board) && (cmd == 62) &&
@@ -3532,11 +3573,11 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
       case ROBOTIC_CMD_MESSAGE_BOX_CENTER_LINE:
       {
         // Box messages!
-        char label_buffer[ROBOT_MAX_TR];
-        int next_prog_line, next_cmd;
-
+        static char label_buffer[ROBOT_MAX_TR];
+        static int next_prog_line, next_cmd;
+        cr_before(2);
         robot_box_display(mzx_world, cmd_ptr - 1, label_buffer, id);
-
+        cr_after();
         // Move to end of all box mesg cmds.
         while(1)
         {
@@ -3557,9 +3598,10 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
         }
 
         // Send label
-        if(label_buffer[0])
-          gotoed = send_self_label_tr(mzx_world, label_buffer, id);
 
+        if(label_buffer[0]) {
+          gotoed = send_self_label_tr(mzx_world, label_buffer, id);
+        }
         /* If this isn't a label jump, or the jump failed, don't
          * execute the workaround for subroutines. Subroutine jumps
          * play tricks with the cur_prog_line variable, so we must not
@@ -3568,7 +3610,6 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
          */
         if(!gotoed)
           cur_robot->cur_prog_line += program[cur_robot->cur_prog_line] + 2;
-
         goto breaker;
       }
 
@@ -3683,11 +3724,13 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
 
         m_show();
         src_board->input_string[0] = 0;
-
+        cr_before(1);
         intake(mzx_world, src_board->input_string,
          70, 5, 13, 15, 1, 0, NULL, 0, NULL);
-
+        cr_after();
+        cr_before(9);
         dialog_fadeout();
+        cr_after();
 
         restore_screen();
         src_board->input_size = strlen(src_board->input_string);
@@ -4329,16 +4372,19 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
         // Kick da line break in da pants!
         if((break_pos = strchr(question_buffer, '\n')))
           *break_pos = '\0';
-
-        if(!ask_yes_no(mzx_world, question_buffer))
+        cr_before(3);
+        int retval = !ask_yes_no(mzx_world, question_buffer);
+        cr_after();
+        if(retval)
           send_status = send_robot_id(mzx_world, id, "YES", 1);
         else
           send_status = send_robot_id(mzx_world, id, "NO", 1);
 
         if(!send_status)
           gotoed = 1;
-
+        cr_before(10);
         dialog_fadeout();
+        cr_after();
         break;
       }
 
@@ -5068,13 +5114,17 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
 
       case ROBOTIC_CMD_COLOR_FADE_OUT: // color fade out
       {
+        cr_before(8);
         vquick_fadeout();
+        cr_after();
         break;
       }
 
       case ROBOTIC_CMD_COLOR_FADE_IN: // color fade in
       {
+        cr_before(7);
         vquick_fadein();
+        cr_after();
         break;
       }
 
@@ -5283,8 +5333,14 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
         {
           int fade; // FIXME: Hack!
           redo_load = 0;
-          if(!reload_swap(mzx_world, translated_name, &fade))
+          cr_before(4);
+          bool retval = !reload_swap(mzx_world, translated_name, &fade);
+          cr_after();
+          if(retval) {
+            cr_before(11);
             redo_load = error("Error swapping to next world", 1, 3, 0x2C01);
+            cr_after();
+          }
         } while(redo_load == 2);
 
         // User asked to "Fail" on error message above
@@ -5665,6 +5721,7 @@ void run_robot(struct world *mzx_world, int id, int x, int y)
         break;
       }
     }
+
 
     // Go to next command! First erase prefixes...
     mzx_world->first_prefix = 0;

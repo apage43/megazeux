@@ -33,6 +33,8 @@
 #include "world.h"
 #include "robot.h"
 
+#include "lol_coroutines.h"
+
 static const char scr_nm_strs[5][12] =
  { "  Scroll   ", "   Sign    ", "Edit Scroll", "   Help    ", "" };
 
@@ -80,6 +82,7 @@ static void scroll_frame(struct world *mzx_world, struct scroll *scroll,
     }
     // Next line...
   }
+  
   // Display lines below center line
   pos = old_pos;
   for(t1 = 13; t1 <= 18; t1++)
@@ -106,16 +109,27 @@ static void scroll_frame(struct world *mzx_world, struct scroll *scroll,
 
 void scroll_edit(struct world *mzx_world, struct scroll *scroll, int type)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter_end();
+  
   // Important status vars (insert kept in intake.cpp)
-  unsigned int pos = 1, old_pos; // Where IN scroll?
-  int currx = 0; // X position in line
-  int key; // Key returned by intake()
-  int t1, t2 = -1, t3;
-  char *where; // Where scroll is
-  char line[80]; // For editing
-  int scroll_base_color = mzx_world->scroll_base_color;
-  bool editing = (type == 2);
-
+  static unsigned int pos, old_pos; // Where IN scroll?
+  static int currx ; // X position in line
+  static int key; // Key returned by intake()
+  static int t1, t2, t3;
+  static char *where; // Where scroll is
+  static char line[80]; // For editing
+  static int scroll_base_color;
+  static bool editing;
+  
+  pos = 1;
+  currx = 0;
+  t2 = -1;
+  scroll_base_color = mzx_world->scroll_base_color;
+  editing = (type == 2);
   // Draw screen
   save_screen();
 
@@ -132,10 +146,12 @@ void scroll_edit(struct world *mzx_world, struct scroll *scroll, int type)
   do
   {
     // If the user wants to mask, and we're in the editor..
-    bool mask = mzx_world->conf.mask_midchars && editing;
+    static bool mask;
+    mask = mzx_world->conf.mask_midchars && editing;
 
     // Display scroll
     scroll_frame(mzx_world, scroll, pos, mask);
+
     update_screen();
 
     if(editing)
@@ -151,8 +167,10 @@ void scroll_edit(struct world *mzx_world, struct scroll *scroll, int type)
       where[pos + t1] = 0;
       strcpy(line, where + pos);
       where[pos + t1] = '\n';
+      cr_before(2);
       key = intake(mzx_world, line, 64, 8, 12, scroll_base_color,
        2, 0, &currx, 0, NULL);
+      cr_after();
       // Modify scroll to hold new line (give errors here)
       t2 = (int)strlen(line); // Get length of NEW line
       // Resize and move
@@ -179,7 +197,9 @@ void scroll_edit(struct world *mzx_world, struct scroll *scroll, int type)
     }
     else
     {
+      cr_before(1);
       update_event_status_delay();
+      cr_after();
       key = get_key(keycode_internal);
     }
 
@@ -204,6 +224,7 @@ void scroll_edit(struct world *mzx_world, struct scroll *scroll, int type)
       }
       key = IKEY_ESCAPE;
     }
+    
 
     switch(key)
     {
@@ -375,12 +396,16 @@ void scroll_edit(struct world *mzx_world, struct scroll *scroll, int type)
       case 0:
         break;
     }
+    
     // Continue?
   } while(key != IKEY_ESCAPE);
+  
   // Restore screen and exit
   restore_screen();
 
+  cr_before(3);
   dialog_fadeout();
+  cr_after();
 }
 
 void scroll_edging_ext(struct world *mzx_world, int type, int offset,
@@ -547,11 +572,18 @@ static void help_frame(struct world *mzx_world, char *help, int pos)
 void help_display(struct world *mzx_world, char *help, int offs, char *file,
  char *label)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  
   // Display a help file
-  int pos = offs, old_pos; // Where
-  int key = 0;
-  int t1;
-  char mclick;
+  static int pos, old_pos; // Where
+  static int key;
+  static int t1;
+  static char mclick;
+  pos = offs;
+  key = 0;
   // allow_help = 0;
   // Draw screen
   save_screen();
@@ -569,8 +601,9 @@ void help_display(struct world *mzx_world, char *help, int offs, char *file,
     mclick = 0;
 
     update_screen();
-
+    cr_before(1);
     update_event_status_delay();
+    cr_after();
 
     if(get_mouse_press())
     {
@@ -765,7 +798,9 @@ void help_display(struct world *mzx_world, char *help, int offs, char *file,
 
   // Restore screen and exit
 ex:
+  cr_before(2);
   dialog_fadeout();
+  cr_after();
 
   restore_screen();
 }

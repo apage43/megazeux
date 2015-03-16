@@ -47,10 +47,12 @@ static const char *const error_type_names[] =
 int error(const char *string, unsigned int type, unsigned int options,
  unsigned int code)
 {
-  const char *type_name;
-  int t1 = 9, ret = 0;
-  char temp[5];
-  int x;
+  static const char *type_name;
+  static int t1, ret;
+  static char temp[5];
+  static int x;
+  t1 = 9;
+  ret = 0;
 
   // Find the name of this error type.
   if(type >= sizeof(error_type_names) / sizeof(*error_type_names))

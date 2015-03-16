@@ -41,6 +41,8 @@
 #include "legacy_rasm.h"
 #include "validation.h"
 
+#include "lol_coroutines.h"
+
 static int cmp_labels(const void *dest, const void *src)
 {
   struct label *lsrc = *((struct label **)src);
@@ -1487,18 +1489,16 @@ static int send_robot_direct(struct robot *cur_robot, const char *mesg,
 {
   char *robot_program;
   int new_position;
-
+  
 #ifdef CONFIG_DEBYTECODE
   prepare_robot_bytecode(cur_robot);
 #endif
   robot_program = cur_robot->program_bytecode;
-
   if((cur_robot->is_locked) && (!ignore_lock))
     return 1; // Locked
 
   if(cur_robot->program_bytecode_length < 3)
     return 2; // No program!
-
   // Are we going to a subroutine? Returning?
   if(mesg[0] == '#')
   {
@@ -1520,7 +1520,7 @@ static int send_robot_direct(struct robot *cur_robot, const char *mesg,
       }
     }
     else
-
+    
     // returning to the TOP?
     if(!strcasecmp(mesg + 1, "top"))
     {
@@ -1582,7 +1582,6 @@ static int send_robot_direct(struct robot *cur_robot, const char *mesg,
 
     return 2;
   }
-
   return 0;
 }
 
@@ -2376,9 +2375,18 @@ static void robot_frame(struct world *mzx_world, char *program, int id)
 void robot_box_display(struct world *mzx_world, char *program,
  char *label_storage, int id)
 {
-  struct board *src_board = mzx_world->current_board;
-  struct robot *cur_robot = src_board->robot_list[id];
-  int pos = 0, key, mouse_press;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter_end();
+  
+  static struct board *src_board;
+  static struct robot *cur_robot;
+  static int pos, key, mouse_press;
+  
+  src_board = mzx_world->current_board;
+  cur_robot = src_board->robot_list[id];
+  pos = 0;
 
   label_storage[0] = 0;
 
@@ -2451,8 +2459,9 @@ void robot_box_display(struct world *mzx_world, char *program,
     // Display scroll
     robot_frame(mzx_world, program + pos, id);
     update_screen();
-
+    cr_before(1);
     update_event_status_delay();
+    cr_after();
     key = get_key(keycode_internal);
 
     mouse_press = get_mouse_press_ext();
@@ -2575,8 +2584,10 @@ void robot_box_display(struct world *mzx_world, char *program,
     pos -= program[pos - 1] + 2;
 
   } while(1);
-
+  
+  cr_before(2);
   dialog_fadeout();
+  cr_after();
 
   // Restore screen and exit
   m_hide();

@@ -29,6 +29,8 @@
 #include "util.h"
 #include "validation.h"
 
+#include "lol_coroutines.h"
+
 /* 13 (not NULL terminated in format) */
 #define LEGACY_MOD_FILENAME_MAX 13
 
@@ -157,19 +159,28 @@ static void create_blank_board(struct board *cur_board)
 __editor_maybe_static int load_board_direct(struct board *cur_board,
  FILE *fp, int data_size, int savegame, int version)
 {
-  int num_robots, num_scrolls, num_sensors, num_robots_active;
-  int overlay_mode, size, board_width, board_height, i;
-  int viewport_x, viewport_y, viewport_width, viewport_height;
-  int truncated = 0;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter(2);
+  cr_reenter(3);
+  cr_reenter(4);
+  cr_reenter_end();
+  static int num_robots, num_scrolls, num_sensors, num_robots_active;
+  static int overlay_mode, size, board_width, board_height, i;
+  static int viewport_x, viewport_y, viewport_width, viewport_height;
+  static int truncated;
 
-  struct robot *cur_robot;
-  struct scroll *cur_scroll;
-  struct sensor *cur_sensor;
+  static struct robot *cur_robot;
+  static struct scroll *cur_scroll;
+  static struct sensor *cur_sensor;
 
-  char *test_buffer;
+  static char *test_buffer;
 
-  int board_location = ftell(fp);
-
+  static int board_location;
+  
+  board_location = ftell(fp);
+  truncated = 0;
+  
   cur_board->num_robots = 0;
   cur_board->num_robots_allocated = 0;
   cur_board->num_robots_active = 0;
@@ -551,8 +562,10 @@ __editor_maybe_static int load_board_direct(struct board *cur_board,
 board_scan:
   // Now do a board scan to make sure there aren't more than the data told us.
   {
-    int robot_count = 0, scroll_count = 0, sensor_count = 0;
-    char err_mesg[80] = { 0 };
+    static int robot_count, scroll_count, sensor_count;
+    static char err_mesg[80];
+    robot_count = 0, scroll_count = 0, sensor_count = 0;
+    err_mesg[0] = '\0';
 
     for(i = 0; i < (board_width * board_height); i++)
     {
@@ -604,24 +617,32 @@ board_scan:
     {
       snprintf(err_mesg, 80, "Board @ %Xh: found %i robots; expected %i",
        board_location, robot_count, cur_board->num_robots);
+      cr_before(1);
       error(err_mesg, 1, 8, 0);
+      cr_after();
     }
     if(scroll_count > cur_board->num_scrolls)
     {
       snprintf(err_mesg, 80, "Board @ %Xh: found %i scrolls/signs; expected %i",
        board_location, scroll_count, cur_board->num_scrolls);
+      cr_before(2);
       error(err_mesg, 1, 8, 0);
+      cr_after();
     }
     // This won't be reached but I'll leave it anyway.
     if(sensor_count > cur_board->num_sensors)
     {
       snprintf(err_mesg, 80, "Board @ %Xh: found %i sensors; expected %i",
        board_location, sensor_count, cur_board->num_sensors);
+      cr_before(3);
       error(err_mesg, 1, 8, 0);
+      cr_after();
     }
-    if(err_mesg[0])
+    if(err_mesg[0]) {
+      cr_before(4);
       error("Any extra robots/scrolls/signs were replaced", 1, 8, 0);
-
+      cr_after();
+    }
   }
 
   if(truncated == 1)

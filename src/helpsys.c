@@ -30,6 +30,8 @@
 #include "world.h"
 #include "window.h"
 
+#include "lol_coroutines.h"
+
 static char *help;
 
 void help_open(struct world *mzx_world, const char *file_name)
@@ -52,10 +54,13 @@ void help_close(struct world *mzx_world)
 
 void help_system(struct world *mzx_world)
 {
-  char file[13], file2[13], label[13];
-  int where, offs, size, t1, t2;
-  enum cursor_mode_types old_cmode;
-  FILE *fp;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static char file[13], file2[13], label[13];
+  static int where, offs, size, t1, t2;
+  static enum cursor_mode_types old_cmode;
+  static FILE *fp;
 
   fp = mzx_world->help_file;
   if(!fp)
@@ -80,7 +85,9 @@ void help_system(struct world *mzx_world)
   cursor_off();
 
 labelled:
+  cr_before(1);
   help_display(mzx_world, help, offs, file, label);
+  cr_after();
 
   // File?
   if(file[0])

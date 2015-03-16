@@ -51,6 +51,8 @@
 
 #include "util.h"
 
+#include "lol_coroutines.h"
+
 #define CURSOR_BLINK_RATE 115
 
 __editor_maybe_static struct graphics_data graphics;
@@ -513,11 +515,38 @@ void dialog_fadein(void)
   }
 }
 
+// Instant fade out, no delay
+void insta_fadeout_nd(void)
+{
+  static Uint32 i, num_colors;
+
+  if(graphics.fade_status)
+    return;
+
+  if(graphics.screen_mode >= 2)
+    num_colors = SMZX_PAL_SIZE;
+  else
+    num_colors = PAL_SIZE;
+
+  for(i = 0; i < num_colors; i++)
+    set_color_intensity(i, 0);
+
+  update_palette();
+  update_screen(); // NOTE: this was called conditionally in 2.81e
+
+  graphics.fade_status = true;
+}
+
 void dialog_fadeout(void)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
   if(get_fade_status())
   {
-    insta_fadeout();
+    cr_before(1);
+    insta_fadeout_nd();
+    cr_after();
   }
 }
 
@@ -665,10 +694,13 @@ void update_screen(void)
 // to use in conjuction with the next function.
 void vquick_fadeout(void)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
   if(!graphics.fade_status)
   {
-    Sint32 i, i2, num_colors;
-    Uint32 ticks;
+    static Sint32 i, i2, num_colors;
+    static Uint32 ticks;
 
     if(graphics.screen_mode >= 2)
       num_colors = SMZX_PAL_SIZE;
@@ -688,8 +720,11 @@ void vquick_fadeout(void)
       update_palette();
       update_screen();
       ticks = get_ticks() - ticks;
-      if(ticks <= 16)
-        delay(16 - ticks);
+      if(ticks <= 16) {
+        cr_before(1);
+        cr_delay(16 - ticks);
+        cr_after();
+      }
     }
     graphics.fade_status = 1;
   }
@@ -699,10 +734,13 @@ void vquick_fadeout(void)
 // use in conjuction with the previous function.
 void vquick_fadein(void)
 {
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
   if(graphics.fade_status)
   {
-    Uint32 i, i2, num_colors;
-    Uint32 ticks;
+    static Uint32 i, i2, num_colors;
+    static Uint32 ticks;
 
     graphics.fade_status = 0;
 
@@ -721,8 +759,11 @@ void vquick_fadein(void)
       update_palette();
       update_screen();
       ticks = get_ticks() - ticks;
-      if(ticks <= 16)
-        delay(16 - ticks);
+      if(ticks <= 16) {
+        cr_before(1);
+        cr_delay(16 - ticks);
+        cr_after();
+      }
     }
   }
 }
@@ -730,7 +771,10 @@ void vquick_fadein(void)
 // Instant fade out
 void insta_fadeout(void)
 {
-  Uint32 i, num_colors;
+  cr_begin();
+  cr_reenter(1);
+  cr_reenter_end();
+  static Uint32 i, num_colors;
 
   if(graphics.fade_status)
     return;
@@ -743,7 +787,9 @@ void insta_fadeout(void)
   for(i = 0; i < num_colors; i++)
     set_color_intensity(i, 0);
 
-  delay(1);
+  cr_before(1);
+  cr_delay(1);
+  cr_after();
   update_palette();
   update_screen(); // NOTE: this was called conditionally in 2.81e
 
